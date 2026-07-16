@@ -1,13 +1,13 @@
-import { definePlugin } from "@oxlint/plugins";
+import { definePlugin } from '@oxlint/plugins';
 
-import preferZodNamespace from "./rules/prefer-zod-namespace";
+import preferZodNamespace from './rules/prefer-zod-namespace';
 
 const importZod = definePlugin({
   meta: {
-    name: "import-zod",
+    name: 'import-zod',
   },
   rules: {
-    "prefer-zod-namespace": preferZodNamespace,
+    'prefer-zod-namespace': preferZodNamespace,
   },
 });
 

@@ -1,4 +1,4 @@
-import type { ESTree, Rule } from "@oxlint/plugins";
+import type { ESTree, Rule } from '@oxlint/plugins';
 
 type ImportSpecifier = ESTree.ImportSpecifier;
 type ImportDefaultSpecifier = ESTree.ImportDefaultSpecifier;
@@ -6,21 +6,21 @@ type ImportDeclaration = ESTree.ImportDeclaration;
 type ImportDeclarationSpecifier = ESTree.ImportDeclarationSpecifier;
 type NamespaceTarget = ImportSpecifier | ImportDefaultSpecifier;
 
-const CORE_SUBMODULE_SOURCE = "zod/v4";
-const CORE_SUBMODULE_NAME = "core";
+const CORE_SUBMODULE_SOURCE = 'zod/v4';
+const CORE_SUBMODULE_NAME = 'core';
 // Default imports (any local name) are always converted; named imports only
 // need converting when they bind one of these exports.
-const NAMESPACE_TARGET_NAMES = new Set(["z", CORE_SUBMODULE_NAME]);
+const NAMESPACE_TARGET_NAMES = new Set(['z', CORE_SUBMODULE_NAME]);
 
 const isImportSpecifier = (specifier: ImportDeclarationSpecifier): specifier is ImportSpecifier =>
-  specifier.type === "ImportSpecifier";
+  specifier.type === 'ImportSpecifier';
 
 const isImportDefaultSpecifier = (
   specifier: ImportDeclarationSpecifier,
-): specifier is ImportDefaultSpecifier => specifier.type === "ImportDefaultSpecifier";
+): specifier is ImportDefaultSpecifier => specifier.type === 'ImportDefaultSpecifier';
 
 const getImportedName = (specifier: ImportSpecifier): string =>
-  specifier.imported.type === "Identifier" ? specifier.imported.name : "";
+  specifier.imported.type === 'Identifier' ? specifier.imported.name : '';
 
 // `core` imported from `zod/v4` has its own namespace entry point at
 // `zod/v4/core`; every other import keeps its original source.
@@ -32,13 +32,13 @@ const resolveNamespaceSource = (importedName: string, originalSource: string): s
 // Renders a single specifier back to source text, preserving aliasing and
 // per-specifier `type` modifiers (which only matter outside a type-only import).
 const printSpecifier = (specifier: NamespaceTarget, isTypeOnlyImport: boolean): string => {
-  if (specifier.type === "ImportDefaultSpecifier") {
+  if (specifier.type === 'ImportDefaultSpecifier') {
     return specifier.local.name;
   }
 
   const importedName = getImportedName(specifier);
   const localName = specifier.local.name;
-  const typeModifier = !isTypeOnlyImport && specifier.importKind === "type" ? "type " : "";
+  const typeModifier = !isTypeOnlyImport && specifier.importKind === 'type' ? 'type ' : '';
 
   return importedName === localName
     ? `${typeModifier}${importedName}`
@@ -60,26 +60,26 @@ const printImportStatement = (
     parts.push(printSpecifier(defaultSpecifier, isTypeOnlyImport));
   }
   if (namedSpecifiers.length > 0) {
-    parts.push(`{ ${namedSpecifiers.map((s) => printSpecifier(s, isTypeOnlyImport)).join(", ")} }`);
+    parts.push(`{ ${namedSpecifiers.map((s) => printSpecifier(s, isTypeOnlyImport)).join(', ')} }`);
   }
 
-  return `import ${isTypeOnlyImport ? "type " : ""}${parts.join(", ")} from '${source}';`;
+  return `import ${isTypeOnlyImport ? 'type ' : ''}${parts.join(', ')} from '${source}';`;
 };
 
 const printNamespaceImport = (
   localName: string,
   source: string,
   isTypeOnlyImport: boolean,
-): string => `import ${isTypeOnlyImport ? "type " : ""}* as ${localName} from '${source}';`;
+): string => `import ${isTypeOnlyImport ? 'type ' : ''}* as ${localName} from '${source}';`;
 
 const rule: Rule = {
   meta: {
-    type: "suggestion",
+    type: 'suggestion',
     docs: {
-      description: "Enforce using namespace imports for zod",
-      url: "https://github.com/samchungy/oxlint-plugin-import-zod/blob/main/docs/rules/prefer-zod-namespace.md",
+      description: 'Enforce using namespace imports for zod',
+      url: 'https://github.com/samchungy/oxlint-plugin-import-zod/blob/main/docs/rules/prefer-zod-namespace.md',
     },
-    fixable: "code",
+    fixable: 'code',
     schema: [],
     messages: {
       preferNamespaceImport:
@@ -91,7 +91,7 @@ const rule: Rule = {
     return {
       ImportDeclaration(node: ImportDeclaration) {
         // Only target imports from 'zod' or 'zod/*'
-        if (node.source.value !== "zod" && !node.source.value.startsWith("zod/")) {
+        if (node.source.value !== 'zod' && !node.source.value.startsWith('zod/')) {
           return;
         }
 
@@ -114,12 +114,12 @@ const rule: Rule = {
           return;
         }
 
-        const isTypeOnlyImport = node.importKind === "type";
+        const isTypeOnlyImport = node.importKind === 'type';
         const originalSource = node.source.value;
 
         for (const target of targets) {
           const importedName =
-            target.type === "ImportSpecifier" ? getImportedName(target) : undefined;
+            target.type === 'ImportSpecifier' ? getImportedName(target) : undefined;
           const importSource =
             importedName === undefined
               ? originalSource
@@ -128,7 +128,7 @@ const rule: Rule = {
 
           context.report({
             node: target,
-            messageId: "preferNamespaceImport",
+            messageId: 'preferNamespaceImport',
             fix(fixer) {
               const namespaceImport = printNamespaceImport(
                 target.local.name,

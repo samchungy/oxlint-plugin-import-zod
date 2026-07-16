@@ -31,12 +31,12 @@ Or, if you're using the TypeScript config format:
 
 ```ts
 // oxlint.config.ts
-import { defineConfig } from "oxlint";
+import { defineConfig } from 'oxlint';
 
 export default defineConfig({
-  jsPlugins: ["oxlint-plugin-import-zod"],
+  jsPlugins: ['oxlint-plugin-import-zod'],
   rules: {
-    "import-zod/prefer-zod-namespace": "error",
+    'import-zod/prefer-zod-namespace': 'error',
   },
 });
 ```
@@ -131,13 +131,13 @@ This rule is automatically fixable. When using `--fix`, Oxlint will:
 - Convert `import { core } from 'zod/v4';` to `import * as core from 'zod/v4/core';`
 - Split mixed imports like `import { ZodError, z } from 'zod';` into:
   ```js
-  import * as z from "zod";
-  import { ZodError } from "zod";
+  import * as z from 'zod';
+  import { ZodError } from 'zod';
   ```
 - Split default and named imports like `import z, { toJSONSchema } from 'zod';` into:
   ```js
-  import * as z from "zod";
-  import { toJSONSchema } from "zod";
+  import * as z from 'zod';
+  import { toJSONSchema } from 'zod';
   ```
 - Split type imports like `import type { ZodError, z } from 'zod';` into:
   ```js
