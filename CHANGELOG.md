@@ -1,5 +1,11 @@
 # oxlint-plugin-import-zod
 
+## 1.0.1
+
+### Patch Changes
+
+- b3e57f3: Fix release
+
 ## 1.0.0
 
 ### Major Changes
