@@ -111,8 +111,7 @@ ruleTester.run("prefer-zod-namespace-import", rule, {
     },
     {
       code: "import zod, { toJSONSchema } from 'zod';",
-      output:
-        "import * as zod from 'zod';\nimport { toJSONSchema } from 'zod';",
+      output: "import * as zod from 'zod';\nimport { toJSONSchema } from 'zod';",
       errors: [{ messageId: "preferNamespaceImport" }],
     },
     // Submodule imports from zod/v4
@@ -133,8 +132,7 @@ ruleTester.run("prefer-zod-namespace-import", rule, {
     },
     {
       code: "import { toJSONSchema, core } from 'zod/v4';",
-      output:
-        "import * as core from 'zod/v4/core';\nimport { toJSONSchema } from 'zod/v4';",
+      output: "import * as core from 'zod/v4/core';\nimport { toJSONSchema } from 'zod/v4';",
       errors: [{ messageId: "preferNamespaceImport" }],
     },
     // Type-only import case
@@ -152,8 +150,7 @@ ruleTester.run("prefer-zod-namespace-import", rule, {
     // Complex type-only import case
     {
       code: "import type { toJSONSchema, z } from 'zod';",
-      output:
-        "import type * as z from 'zod';\nimport type { toJSONSchema } from 'zod';",
+      output: "import type * as z from 'zod';\nimport type { toJSONSchema } from 'zod';",
       errors: [{ messageId: "preferNamespaceImport" }],
     },
     // Case with renamed import
@@ -165,8 +162,7 @@ ruleTester.run("prefer-zod-namespace-import", rule, {
     // Complex case with renamed imports
     {
       code: "import { toJSONSchema as schema, z } from 'zod';",
-      output:
-        "import * as z from 'zod';\nimport { toJSONSchema as schema } from 'zod';",
+      output: "import * as z from 'zod';\nimport { toJSONSchema as schema } from 'zod';",
       errors: [{ messageId: "preferNamespaceImport" }],
     },
     // Type import case with z

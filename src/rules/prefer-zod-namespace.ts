@@ -12,43 +12,33 @@ const CORE_SUBMODULE_NAME = "core";
 // need converting when they bind one of these exports.
 const NAMESPACE_TARGET_NAMES = new Set(["z", CORE_SUBMODULE_NAME]);
 
-const isImportSpecifier = (
-  specifier: ImportDeclarationSpecifier
-): specifier is ImportSpecifier => specifier.type === "ImportSpecifier";
+const isImportSpecifier = (specifier: ImportDeclarationSpecifier): specifier is ImportSpecifier =>
+  specifier.type === "ImportSpecifier";
 
 const isImportDefaultSpecifier = (
-  specifier: ImportDeclarationSpecifier
-): specifier is ImportDefaultSpecifier =>
-  specifier.type === "ImportDefaultSpecifier";
+  specifier: ImportDeclarationSpecifier,
+): specifier is ImportDefaultSpecifier => specifier.type === "ImportDefaultSpecifier";
 
 const getImportedName = (specifier: ImportSpecifier): string =>
   specifier.imported.type === "Identifier" ? specifier.imported.name : "";
 
 // `core` imported from `zod/v4` has its own namespace entry point at
 // `zod/v4/core`; every other import keeps its original source.
-const resolveNamespaceSource = (
-  importedName: string,
-  originalSource: string
-): string =>
-  importedName === CORE_SUBMODULE_NAME &&
-  originalSource === CORE_SUBMODULE_SOURCE
+const resolveNamespaceSource = (importedName: string, originalSource: string): string =>
+  importedName === CORE_SUBMODULE_NAME && originalSource === CORE_SUBMODULE_SOURCE
     ? `${originalSource}/${importedName}`
     : originalSource;
 
 // Renders a single specifier back to source text, preserving aliasing and
 // per-specifier `type` modifiers (which only matter outside a type-only import).
-const printSpecifier = (
-  specifier: NamespaceTarget,
-  isTypeOnlyImport: boolean
-): string => {
+const printSpecifier = (specifier: NamespaceTarget, isTypeOnlyImport: boolean): string => {
   if (specifier.type === "ImportDefaultSpecifier") {
     return specifier.local.name;
   }
 
   const importedName = getImportedName(specifier);
   const localName = specifier.local.name;
-  const typeModifier =
-    !isTypeOnlyImport && specifier.importKind === "type" ? "type " : "";
+  const typeModifier = !isTypeOnlyImport && specifier.importKind === "type" ? "type " : "";
 
   return importedName === localName
     ? `${typeModifier}${importedName}`
@@ -60,7 +50,7 @@ const printSpecifier = (
 const printImportStatement = (
   specifiers: ImportDeclarationSpecifier[],
   source: string,
-  isTypeOnlyImport: boolean
+  isTypeOnlyImport: boolean,
 ): string => {
   const parts: string[] = [];
   const defaultSpecifier = specifiers.find(isImportDefaultSpecifier);
@@ -70,26 +60,17 @@ const printImportStatement = (
     parts.push(printSpecifier(defaultSpecifier, isTypeOnlyImport));
   }
   if (namedSpecifiers.length > 0) {
-    parts.push(
-      `{ ${namedSpecifiers
-        .map((s) => printSpecifier(s, isTypeOnlyImport))
-        .join(", ")} }`
-    );
+    parts.push(`{ ${namedSpecifiers.map((s) => printSpecifier(s, isTypeOnlyImport)).join(", ")} }`);
   }
 
-  return `import ${isTypeOnlyImport ? "type " : ""}${parts.join(
-    ", "
-  )} from '${source}';`;
+  return `import ${isTypeOnlyImport ? "type " : ""}${parts.join(", ")} from '${source}';`;
 };
 
 const printNamespaceImport = (
   localName: string,
   source: string,
-  isTypeOnlyImport: boolean
-): string =>
-  `import ${
-    isTypeOnlyImport ? "type " : ""
-  }* as ${localName} from '${source}';`;
+  isTypeOnlyImport: boolean,
+): string => `import ${isTypeOnlyImport ? "type " : ""}* as ${localName} from '${source}';`;
 
 const rule: Rule = {
   meta: {
@@ -110,10 +91,7 @@ const rule: Rule = {
     return {
       ImportDeclaration(node: ImportDeclaration) {
         // Only target imports from 'zod' or 'zod/*'
-        if (
-          node.source.value !== "zod" &&
-          !node.source.value.startsWith("zod/")
-        ) {
+        if (node.source.value !== "zod" && !node.source.value.startsWith("zod/")) {
           return;
         }
 
@@ -130,9 +108,7 @@ const rule: Rule = {
 
         const targets: NamespaceTarget[] = [
           ...defaultSpecifiers,
-          ...namedSpecifiers.filter((s) =>
-            NAMESPACE_TARGET_NAMES.has(getImportedName(s))
-          ),
+          ...namedSpecifiers.filter((s) => NAMESPACE_TARGET_NAMES.has(getImportedName(s))),
         ];
         if (targets.length === 0) {
           return;
@@ -143,9 +119,7 @@ const rule: Rule = {
 
         for (const target of targets) {
           const importedName =
-            target.type === "ImportSpecifier"
-              ? getImportedName(target)
-              : undefined;
+            target.type === "ImportSpecifier" ? getImportedName(target) : undefined;
           const importSource =
             importedName === undefined
               ? originalSource
@@ -159,12 +133,10 @@ const rule: Rule = {
               const namespaceImport = printNamespaceImport(
                 target.local.name,
                 importSource,
-                isTypeOnlyImport
+                isTypeOnlyImport,
               );
 
-              const remainingSpecifiers = node.specifiers.filter(
-                (s) => s !== target
-              );
+              const remainingSpecifiers = node.specifiers.filter((s) => s !== target);
 
               // Either nothing else is imported from this source, or everything left
               // over also targets this same submodule namespace (and gets its own fix).
@@ -172,9 +144,7 @@ const rule: Rule = {
                 remainingSpecifiers.length === 0 ||
                 (isSubmoduleImport &&
                   remainingSpecifiers.every(
-                    (s) =>
-                      isImportSpecifier(s) &&
-                      getImportedName(s) === importedName
+                    (s) => isImportSpecifier(s) && getImportedName(s) === importedName,
                   ));
 
               if (canReplaceWhole) {
@@ -184,13 +154,10 @@ const rule: Rule = {
               const remainderImport = printImportStatement(
                 remainingSpecifiers,
                 originalSource,
-                isTypeOnlyImport
+                isTypeOnlyImport,
               );
 
-              return fixer.replaceText(
-                node,
-                `${namespaceImport}\n${remainderImport}`
-              );
+              return fixer.replaceText(node, `${namespaceImport}\n${remainderImport}`);
             },
           });
         }

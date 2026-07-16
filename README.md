@@ -22,8 +22,8 @@ Add the plugin to your `.oxlintrc.json`, under `jsPlugins`, then enable the rule
 {
   "jsPlugins": ["oxlint-plugin-import-zod"],
   "rules": {
-    "import-zod/prefer-zod-namespace": "error"
-  }
+    "import-zod/prefer-zod-namespace": "error",
+  },
 }
 ```
 
