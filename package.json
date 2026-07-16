@@ -1,6 +1,6 @@
 {
   "name": "oxlint-plugin-import-zod",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Oxlint plugin to enforce namespace imports for zod",
   "keywords": [
     "imports",
