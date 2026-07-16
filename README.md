@@ -5,7 +5,7 @@
 
 [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) plugin to enforce namespace imports for zod. This plugin provides a rule that ensures all imports of zod use the namespace import style (`import * as z from "zod";`) instead of named imports or default imports to promote better tree-shaking and reduce bundle sizes. See [this Zod issue comment](https://github.com/colinhacks/zod/issues/4433#issuecomment-2921500831) for a more detailed explanation.
 
-This plugin is written using [Oxlint's JS plugin API](https://oxc.rs/docs/guide/usage/linter/js-plugins.html).
+This plugin is written using [Oxlint's JS plugin API](https://oxc.rs/docs/guide/usage/linter/js-plugins.html) and is a rewrite of [eslint-plugin-import-zod](https://github.com/samchungy/eslint-plugin-import-zod).
 
 ## Installation
 
