@@ -1,37 +1,14 @@
-import preferZodNamespace from "./rules/prefer-zod-namespace";
-import { TSESLint } from "@typescript-eslint/utils";
-import type { ESLint, Linter } from "eslint";
+import { definePlugin } from "@oxlint/plugins";
 
-// Create the base plugin object
-const importZod = {
+import preferZodNamespace from "./rules/prefer-zod-namespace";
+
+const importZod = definePlugin({
   meta: {
     name: "import-zod",
-    version: "1.0.0",
   },
   rules: {
-    "prefer-zod-namespace": preferZodNamespace as unknown as NonNullable<
-      ESLint.Plugin["rules"]
-    >[string],
+    "prefer-zod-namespace": preferZodNamespace,
   },
-  configs: {} as {
-    recommended: Linter.Config[];
-  },
-} satisfies ESLint.Plugin;
+});
 
-Object.assign(
-  importZod.configs as NonNullable<TSESLint.Linter.Plugin["configs"]>,
-  {
-    recommended: [
-      {
-        plugins: {
-          "import-zod": importZod,
-        },
-        rules: {
-          "import-zod/prefer-zod-namespace": "error",
-        },
-      },
-    ] satisfies Linter.Config[],
-  }
-);
-
-export = importZod;
+export default importZod;

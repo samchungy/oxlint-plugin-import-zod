@@ -1,4 +1,4 @@
-# eslint-plugin-import-zod Rules
+# oxlint-plugin-import-zod Rules
 
 This plugin provides rules to enforce best practices when using zod in your projects.
 

@@ -1,52 +1,114 @@
-import { TSESTree } from "@typescript-eslint/utils";
-import { ESLintUtils } from "@typescript-eslint/utils";
+import type { ESTree, Rule } from "@oxlint/plugins";
 
-const createRule = ESLintUtils.RuleCreator(
-  (name: string) =>
-    `https://github.com/samchungy/eslint-plugin-import-zod/blob/main/docs/rules/${name}.md`
-);
+type ImportSpecifier = ESTree.ImportSpecifier;
+type ImportDefaultSpecifier = ESTree.ImportDefaultSpecifier;
+type ImportDeclaration = ESTree.ImportDeclaration;
+type ImportDeclarationSpecifier = ESTree.ImportDeclarationSpecifier;
+type NamespaceTarget = ImportSpecifier | ImportDefaultSpecifier;
 
-const getImportSource = (
+const CORE_SUBMODULE_SOURCE = "zod/v4";
+const CORE_SUBMODULE_NAME = "core";
+// Default imports (any local name) are always converted; named imports only
+// need converting when they bind one of these exports.
+const NAMESPACE_TARGET_NAMES = new Set(["z", CORE_SUBMODULE_NAME]);
+
+const isImportSpecifier = (
+  specifier: ImportDeclarationSpecifier
+): specifier is ImportSpecifier => specifier.type === "ImportSpecifier";
+
+const isImportDefaultSpecifier = (
+  specifier: ImportDeclarationSpecifier
+): specifier is ImportDefaultSpecifier =>
+  specifier.type === "ImportDefaultSpecifier";
+
+const getImportedName = (specifier: ImportSpecifier): string =>
+  specifier.imported.type === "Identifier" ? specifier.imported.name : "";
+
+// `core` imported from `zod/v4` has its own namespace entry point at
+// `zod/v4/core`; every other import keeps its original source.
+const resolveNamespaceSource = (
   importedName: string,
   originalSource: string
-): string => {
-  return importedName === "core" && originalSource === "zod/v4"
+): string =>
+  importedName === CORE_SUBMODULE_NAME &&
+  originalSource === CORE_SUBMODULE_SOURCE
     ? `${originalSource}/${importedName}`
     : originalSource;
+
+// Renders a single specifier back to source text, preserving aliasing and
+// per-specifier `type` modifiers (which only matter outside a type-only import).
+const printSpecifier = (
+  specifier: NamespaceTarget,
+  isTypeOnlyImport: boolean
+): string => {
+  if (specifier.type === "ImportDefaultSpecifier") {
+    return specifier.local.name;
+  }
+
+  const importedName = getImportedName(specifier);
+  const localName = specifier.local.name;
+  const typeModifier =
+    !isTypeOnlyImport && specifier.importKind === "type" ? "type " : "";
+
+  return importedName === localName
+    ? `${typeModifier}${importedName}`
+    : `${typeModifier}${importedName} as ${localName}`;
 };
 
-const isAllSameSubmodule = (
-  specifiers: TSESTree.ImportSpecifier[],
-  targetName: string
-): boolean => {
-  return specifiers.every(
-    (s) =>
-      s.imported.type === TSESTree.AST_NODE_TYPES.Identifier &&
-      s.imported.name === targetName
-  );
+// Renders `import [type] Default, { named, ... } from '<source>';` for
+// whatever mix of default/named specifiers remains after extracting a target.
+const printImportStatement = (
+  specifiers: ImportDeclarationSpecifier[],
+  source: string,
+  isTypeOnlyImport: boolean
+): string => {
+  const parts: string[] = [];
+  const defaultSpecifier = specifiers.find(isImportDefaultSpecifier);
+  const namedSpecifiers = specifiers.filter(isImportSpecifier);
+
+  if (defaultSpecifier) {
+    parts.push(printSpecifier(defaultSpecifier, isTypeOnlyImport));
+  }
+  if (namedSpecifiers.length > 0) {
+    parts.push(
+      `{ ${namedSpecifiers
+        .map((s) => printSpecifier(s, isTypeOnlyImport))
+        .join(", ")} }`
+    );
+  }
+
+  return `import ${isTypeOnlyImport ? "type " : ""}${parts.join(
+    ", "
+  )} from '${source}';`;
 };
 
-export default createRule({
-  name: "prefer-zod-namespace",
+const printNamespaceImport = (
+  localName: string,
+  source: string,
+  isTypeOnlyImport: boolean
+): string =>
+  `import ${
+    isTypeOnlyImport ? "type " : ""
+  }* as ${localName} from '${source}';`;
+
+const rule: Rule = {
   meta: {
     type: "suggestion",
     docs: {
       description: "Enforce using namespace imports for zod",
+      url: "https://github.com/samchungy/oxlint-plugin-import-zod/blob/main/docs/rules/prefer-zod-namespace.md",
     },
-    fixable: "code", // This rule is automatically fixable
-    schema: [], // No options
+    fixable: "code",
+    schema: [],
     messages: {
       preferNamespaceImport:
         'Import zod as a namespace (import * as z from "zod") instead of destructuring its exports or using default imports',
     },
   },
 
-  defaultOptions: [],
-
-  create(context) {
+  createOnce(context) {
     return {
-      // Handle import declarations
-      ImportDeclaration(node: TSESTree.ImportDeclaration) {
+      ImportDeclaration(node: ImportDeclaration) {
         // Only target imports from 'zod' or 'zod/*'
         if (
           node.source.value !== "zod" &&
@@ -55,200 +117,86 @@ export default createRule({
           return;
         }
 
-        // Check if it's a named import (e.g., import { z } from 'zod')
-        const namedSpecifiers = node.specifiers.filter(
-          (specifier) =>
-            specifier.type === TSESTree.AST_NODE_TYPES.ImportSpecifier
-        );
+        // Single pass over specifiers instead of filtering the array twice.
+        const namedSpecifiers: ImportSpecifier[] = [];
+        const defaultSpecifiers: ImportDefaultSpecifier[] = [];
+        for (const specifier of node.specifiers) {
+          if (isImportSpecifier(specifier)) {
+            namedSpecifiers.push(specifier);
+          } else if (isImportDefaultSpecifier(specifier)) {
+            defaultSpecifiers.push(specifier);
+          }
+        }
 
-        // Check if it's a default import (e.g., import z from 'zod')
-        const defaultSpecifiers = node.specifiers.filter(
-          (specifier) =>
-            specifier.type === TSESTree.AST_NODE_TYPES.ImportDefaultSpecifier
-        );
-
-        // If there are no named or default imports, there's nothing to check
-        if (namedSpecifiers.length === 0 && defaultSpecifiers.length === 0) {
+        const targets: NamespaceTarget[] = [
+          ...defaultSpecifiers,
+          ...namedSpecifiers.filter((s) =>
+            NAMESPACE_TARGET_NAMES.has(getImportedName(s))
+          ),
+        ];
+        if (targets.length === 0) {
           return;
         }
 
-        // Find 'z' or 'core' imports specifically in named imports
-        const zodSpecifiers = namedSpecifiers.filter(
-          (
-            specifier: TSESTree.ImportSpecifier
-          ): specifier is TSESTree.ImportSpecifier & {
-            imported: TSESTree.Identifier;
-          } =>
-            specifier.imported.type === TSESTree.AST_NODE_TYPES.Identifier &&
-            (specifier.imported.name === "z" ||
-              specifier.imported.name === "core")
-        );
+        const isTypeOnlyImport = node.importKind === "type";
+        const originalSource = node.source.value;
 
-        // Find all default imports (any name)
-        const zodDefaultSpecifiers = defaultSpecifiers;
+        for (const target of targets) {
+          const importedName =
+            target.type === "ImportSpecifier"
+              ? getImportedName(target)
+              : undefined;
+          const importSource =
+            importedName === undefined
+              ? originalSource
+              : resolveNamespaceSource(importedName, originalSource);
+          const isSubmoduleImport = importSource !== originalSource;
 
-        // If there's no 'z' or 'core' named import and no default imports, we don't need to do anything
-        if (zodSpecifiers.length === 0 && zodDefaultSpecifiers.length === 0) {
-          return;
-        }
-
-        // Handle each zod default specifier
-        for (const zodDefaultSpecifier of zodDefaultSpecifiers) {
-          const localName = zodDefaultSpecifier.local.name;
-          const importSource = node.source.value;
-
-          // Report the issue for default import
           context.report({
-            node: zodDefaultSpecifier,
+            node: target,
             messageId: "preferNamespaceImport",
             fix(fixer) {
-              // If this is the only specifier
-              if (node.specifiers.length === 1) {
-                // Simple case: just replace with a namespace import
-                const isTypeOnlyImport = node.importKind === "type";
-                const typePrefix = isTypeOnlyImport ? "type " : "";
-                return fixer.replaceText(
-                  node,
-                  `import ${typePrefix}* as ${localName} from '${importSource}';`
-                );
-              } else {
-                // Handle the case where we need to split imports
-                const otherSpecifiers = node.specifiers.filter(
-                  (s) => s !== zodDefaultSpecifier
-                );
+              const namespaceImport = printNamespaceImport(
+                target.local.name,
+                importSource,
+                isTypeOnlyImport
+              );
 
-                // Check if this is a type-only import
-                const isTypeOnlyImport = node.importKind === "type";
+              const remainingSpecifiers = node.specifiers.filter(
+                (s) => s !== target
+              );
 
-                // Create a namespace import for the zod default specifier
-                const typePrefix = isTypeOnlyImport ? "type " : "";
-                const namespaceImport = `import ${typePrefix}* as ${localName} from '${importSource}';\n`;
-
-                // Create a new import for the other specifiers
-                const otherImportParts: string[] = [];
-
-                // Handle other default imports
-                const otherDefaultSpecifiers = otherSpecifiers.filter(
-                  (s) =>
-                    s.type === TSESTree.AST_NODE_TYPES.ImportDefaultSpecifier
-                );
-
-                // Handle other named imports
-                const otherNamedSpecifiers = otherSpecifiers.filter(
-                  (s) => s.type === TSESTree.AST_NODE_TYPES.ImportSpecifier
-                );
-
-                if (otherDefaultSpecifiers.length > 0) {
-                  const defaultName = otherDefaultSpecifiers[0].local.name;
-                  otherImportParts.push(defaultName);
-                }
-
-                if (otherNamedSpecifiers.length > 0) {
-                  const namedPart = `{ ${otherNamedSpecifiers
-                    .map((s) => {
-                      const specifierLocalName = s.local.name;
-                      const specifierImportedName =
-                        s.imported.type === TSESTree.AST_NODE_TYPES.Identifier
-                          ? s.imported.name
-                          : "";
-                      // Preserve individual type imports when not a type-only import
-                      const typeModifier =
-                        !isTypeOnlyImport && s.importKind === "type"
-                          ? "type "
-                          : "";
-                      return specifierLocalName === specifierImportedName
-                        ? `${typeModifier}${specifierImportedName}`
-                        : `${typeModifier}${specifierImportedName} as ${specifierLocalName}`;
-                    })
-                    .join(", ")} }`;
-                  otherImportParts.push(namedPart);
-                }
-
-                const otherImport = `import ${
-                  isTypeOnlyImport ? "type " : ""
-                }${otherImportParts.join(", ")} from '${importSource}';`;
-
-                // Replace the entire import declaration
-                return fixer.replaceText(
-                  node,
-                  `${namespaceImport}${otherImport}`
-                );
-              }
-            },
-          });
-        }
-
-        // Handle each zod named specifier (existing logic)
-        for (const zodSpecifier of zodSpecifiers) {
-          // Get the local name of the import (in case it's renamed)
-          const localName = zodSpecifier.local.name;
-          const importedName = zodSpecifier.imported.name;
-          const importSource = getImportSource(importedName, node.source.value);
-          const isSubmoduleImport = importSource !== node.source.value;
-
-          // Report the issue
-          context.report({
-            node: zodSpecifier,
-            messageId: "preferNamespaceImport",
-            fix(fixer) {
-              // If this is the only specifier or all specifiers are for the same submodule
-              if (
-                namedSpecifiers.length === 1 ||
+              // Either nothing else is imported from this source, or everything left
+              // over also targets this same submodule namespace (and gets its own fix).
+              const canReplaceWhole =
+                remainingSpecifiers.length === 0 ||
                 (isSubmoduleImport &&
-                  isAllSameSubmodule(namedSpecifiers, importedName))
-              ) {
-                // Simple case: just replace with a namespace import
-                const isTypeOnlyImport = node.importKind === "type";
-                const typePrefix = isTypeOnlyImport ? "type " : "";
-                return fixer.replaceText(
-                  node,
-                  `import ${typePrefix}* as ${localName} from '${importSource}';`
-                );
-              } else {
-                // Handle the case where we need to split imports
-                const otherSpecifiers = namedSpecifiers.filter(
-                  (s) => s !== zodSpecifier
-                );
+                  remainingSpecifiers.every(
+                    (s) =>
+                      isImportSpecifier(s) &&
+                      getImportedName(s) === importedName
+                  ));
 
-                // Check if this is a type-only import
-                const isTypeOnlyImport = node.importKind === "type";
-
-                // Create a namespace import for the zod specifier
-                const typePrefix = isTypeOnlyImport ? "type " : "";
-                const namespaceImport = `import ${typePrefix}* as ${localName} from '${importSource}';\n`;
-
-                // Create a new import for the other specifiers
-                const originalSource = node.source.value;
-                const otherImport = `import ${
-                  isTypeOnlyImport ? "type " : ""
-                }{ ${otherSpecifiers
-                  .map((s) => {
-                    const specifierLocalName = s.local.name;
-                    const specifierImportedName =
-                      s.imported.type === TSESTree.AST_NODE_TYPES.Identifier
-                        ? s.imported.name
-                        : "";
-                    // Preserve individual type imports when not a type-only import
-                    const typeModifier =
-                      !isTypeOnlyImport && s.importKind === "type"
-                        ? "type "
-                        : "";
-                    return specifierLocalName === specifierImportedName
-                      ? `${typeModifier}${specifierImportedName}`
-                      : `${typeModifier}${specifierImportedName} as ${specifierLocalName}`;
-                  })
-                  .join(", ")} } from '${originalSource}';`;
-
-                // Replace the entire import declaration
-                return fixer.replaceText(
-                  node,
-                  `${namespaceImport}${otherImport}`
-                );
+              if (canReplaceWhole) {
+                return fixer.replaceText(node, namespaceImport);
               }
+
+              const remainderImport = printImportStatement(
+                remainingSpecifiers,
+                originalSource,
+                isTypeOnlyImport
+              );
+
+              return fixer.replaceText(
+                node,
+                `${namespaceImport}\n${remainderImport}`
+              );
             },
           });
         }
       },
     };
   },
-});
+};
+
+export default rule;

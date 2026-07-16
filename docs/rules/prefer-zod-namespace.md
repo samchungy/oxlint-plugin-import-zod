@@ -66,4 +66,4 @@ This rule has no options.
 
 ## When Not To Use It
 
-You should not use this rule if you prefer to use named imports for zod or if you have a specific reason to import `z` directly`.
+You should not use this rule if you prefer to use named imports for zod or if you have a specific reason to import `z` directly.

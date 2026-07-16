@@ -1,4 +1,4 @@
-# eslint-plugin-import-zod
+# oxlint-plugin-import-zod
 
 ## 1.2.1
 

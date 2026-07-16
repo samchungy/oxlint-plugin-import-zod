@@ -1,6 +1,6 @@
 src/
 tests/
 tsconfig.json
-.eslintrc
-jest.config.js
+vitest.config.ts
+tsdown.config.mjs
 node_modules/

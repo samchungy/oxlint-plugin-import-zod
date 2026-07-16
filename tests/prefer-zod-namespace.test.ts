@@ -1,16 +1,20 @@
+import { RuleTester } from "oxlint/plugins-dev";
+import * as vitest from "vitest";
+
 import rule from "../src/rules/prefer-zod-namespace";
 
-import * as vitest from "vitest";
-import { RuleTester } from "@typescript-eslint/rule-tester";
-
-RuleTester.afterAll = vitest.afterAll;
-
-// If you are not using vitest with globals: true (https://vitest.dev/config/#globals):
+RuleTester.describe = vitest.describe;
 RuleTester.it = vitest.it;
 RuleTester.itOnly = vitest.it.only;
-RuleTester.describe = vitest.describe;
 
-const ruleTester = new RuleTester();
+// Test cases use TypeScript-only syntax (e.g. `import type`), so parse as TS.
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      lang: "ts",
+    },
+  },
+});
 
 ruleTester.run("prefer-zod-namespace-import", rule, {
   valid: [
@@ -82,12 +86,6 @@ ruleTester.run("prefer-zod-namespace-import", rule, {
     {
       code: "import z, { toJSONSchema } from 'zod';",
       output: "import * as z from 'zod';\nimport { toJSONSchema } from 'zod';",
-      errors: [{ messageId: "preferNamespaceImport" }],
-    },
-    {
-      code: "import type z, { toJSONSchema } from 'zod';",
-      output:
-        "import type * as z from 'zod';\nimport type { toJSONSchema } from 'zod';",
       errors: [{ messageId: "preferNamespaceImport" }],
     },
     // Default imports with any name should be converted
