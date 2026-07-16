@@ -38,9 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Update npm
-        run: npm install -g npm@11.18.0
-
       - name: Release
         uses: changesets/action@v1
         with:
@@ -77,9 +74,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Update npm
-        run: npm install -g npm@11.18.0
 
       - name: Publish
         uses: seek-oss/changesets-snapshot@v0
